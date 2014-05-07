@@ -11,119 +11,117 @@
     <script src="js/GSVPano.js" type="text/javascript"></script>
     <script src="../src/GSVPanoDepth.js" type="text/javascript"></script>
     <script>
-        // var scaryPlace = new google.maps.LatLng(40.7210690835, -73.9981985092);
-        var scaryPlace = new google.maps.LatLng(40.721770, -73.997641);
+      var intersection = new google.maps.LatLng(40.721770, -73.997641);
 
-        function initialize() {
+      function initDepthMap() {
+        var _panoLoader = new GSVPANO.PanoLoader({zoom: 1}),
+            _depthLoader = new GSVPANO.PanoDepthLoader();
 
-          var panoramaOptions = {
-    addressControl: false,
-    clickToGo: false,
-    scrollwheel: false,
-    linksControl: false,
-    disableDoubleClickZoom: false,
-    zoomControlOptions: {
-      style: google.maps.ZoomControlStyle.SMALL
-    },
+        _depthLoader.onDepthLoad = function() {
+          var x, y, canvas, context, image, w, h, c;
 
-            position: scaryPlace,
-            pov: {
-              heading: 0,
-              pitch: 0
+          canvas = document.createElement("canvas");
+          context = canvas.getContext('2d');
+
+          w = this.depthMap.width;
+          h = this.depthMap.height;
+
+          canvas.setAttribute('width', w);
+          canvas.setAttribute('height', h);
+
+          image = context.getImageData(0, 0, w, h);
+
+          for(y=0; y<h; ++y) {
+            for(x=0; x<w; ++x) {
+              c = this.depthMap.depthMap[y*w + x] / 150 * 255;
+              image.data[4*(y*w + x)    ] = c;
+              image.data[4*(y*w + x) + 1] = c;
+              image.data[4*(y*w + x) + 2] = c;
+              image.data[4*(y*w + x) + 3] = 255;
+            }
+          }
+
+          context.putImageData(image, 0, 0);
+
+          gContext = context;
+          gDepthMap = this.depthMap;
+
+          gImageData = image;
+
+          document.getElementById('depth').appendChild(canvas);
+        }
+
+        _panoLoader.onPanoramaLoad = function() {
+          document.getElementById('pano2').appendChild(this.canvas);
+          _depthLoader.load(this.panoId);
+        };
+
+        _panoLoader.load(intersection);
+      }
+
+
+      function initialize() {
+        // Init the depth map
+        initDepthMap();
+
+        // More robust to do all of this AFTER the depth map is created.
+        var panoramaOptions = {
+              addressControl: false,
+              clickToGo: false,
+              scrollwheel: false,
+              linksControl: false,
+              disableDoubleClickZoom: false,
+              zoomControlOptions: {
+                style: google.maps.ZoomControlStyle.SMALL
+              },
+              position: intersection,
+              pov: {
+                heading: 0,
+                pitch: 0
+              },
+              visible: true
             },
-            visible: true
-          };
-          var panorama = new google.maps.StreetViewPanorama(document.getElementById('pano'), panoramaOptions);
-
-        window.marker = new google.maps.Marker({
+            panorama = new google.maps.StreetViewPanorama(document.getElementById('pano'), panoramaOptions),
+            marker = new google.maps.Marker({
               position: new google.maps.LatLng(40.721174, -73.998244),
               map: panorama,
-              icon: 'http://chart.apis.google.com/chart?chst=d_map_pin_icon&chld=cafe|FFFF00',
-              title: 'Doom!'
-          });
+              icon: 'http://visionzero.herokuapp.com/static/css/images/marker-plus.png',
+              title: 'Add a new report'
+            });
 
 
-  google.maps.event.addListener(panorama, 'pov_changed', function() {
-    var pov = panorama.getPov(),
-        heading = pov.heading,
-        pitch = pov.pitch;
-      // console.log('pov_changed: heading', heading);
-      // console.log('pov_changed: pitch', pitch);
+        google.maps.event.addListener(panorama, 'pov_changed', function() {
+          var pov = panorama.getPov(),
+              heading = pov.heading,
+              pitch = pov.pitch,
+              x, y, dist;
+            // console.log('pov_changed: heading', heading);
+            // console.log('pov_changed: pitch', pitch);
 
-    pitch = (90 - pitch) / 180;
+          pitch = (90 - pitch) / 180;
 
-    console.log(heading, (heading) / 360);
-    heading = (-heading+30) / 360;
-
-    var offset = 0;
-
-    var y = Math.round(pitch * (gDepthMap.height - 1)),
-        x = Math.round(heading * (gDepthMap.width - 1)) - offset;
-
-    var dist = gDepthMap.depthMap[y*gDepthMap.width + x]
-
-    console.log(x, y, dist);
-
-    index = (x + y * gDepthMap.width) * 4;
-    gImageData.data[index+0] = 255;
-    gImageData.data[index+1] = 0;
-    gImageData.data[index+2] = 0;
-    gImageData.data[index+3] = 255;
-
-    gContext.putImageData(gImageData, 0, 0);
-  });
+          console.log(heading, (heading) / 360);
+          heading = (-heading+30) / 360;
 
 
-        }
+          y = Math.round(pitch * (gDepthMap.height - 1));
+          x = Math.round(heading * (gDepthMap.width - 1));
 
-        function init() {
-            var _panoLoader = new GSVPANO.PanoLoader({zoom: 1});
-            var _depthLoader = new GSVPANO.PanoDepthLoader();
+          dist = gDepthMap.depthMap[y*gDepthMap.width + x];
 
-            _depthLoader.onDepthLoad = function() {
-                var x, y, canvas, context, image, w, h, c;
+          console.log(x, y, dist);
 
-                canvas = document.createElement("canvas");
-                context = canvas.getContext('2d');
+          index = (x + y * gDepthMap.width) * 4;
+          gImageData.data[index+0] = 255;
+          gImageData.data[index+1] = 0;
+          gImageData.data[index+2] = 0;
+          gImageData.data[index+3] = 255;
 
-                w = this.depthMap.width;
-                h = this.depthMap.height;
+          gContext.putImageData(gImageData, 0, 0);
+        });
+      }
 
-                canvas.setAttribute('width', w);
-                canvas.setAttribute('height', h);
-
-                image = context.getImageData(0, 0, w, h);
-
-                for(y=0; y<h; ++y) {
-                    for(x=0; x<w; ++x) {
-                        c = this.depthMap.depthMap[y*w + x] / 150 * 255;
-                        image.data[4*(y*w + x)    ] = c;
-                        image.data[4*(y*w + x) + 1] = c;
-                        image.data[4*(y*w + x) + 2] = c;
-                        image.data[4*(y*w + x) + 3] = 255;
-                    }
-                }
-
-                context.putImageData(image, 0, 0);
-
-                gContext = context;
-                gDepthMap = this.depthMap;
-
-                gImageData = image;
-
-                document.getElementById('depth').appendChild(canvas);
-            }
-
-            _panoLoader.onPanoramaLoad = function() {
-                document.getElementById('pano2').appendChild(this.canvas);
-                _depthLoader.load(this.panoId);
-            };
-
-            _panoLoader.load(scaryPlace);
-        }
-
-        window.onload = init;
-        google.maps.event.addDomListener(window, 'load', initialize);
+      google.maps.event.addDomListener(window, 'load', initialize);
     </script>
 </head>
 <body>
